@@ -3,7 +3,7 @@ const { WebSocketServer, WebSocket } = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
-const UPSTREAM = 'wss://alfis-mac-mini.taila833af.ts.net:18789';
+const UPSTREAM = 'wss://alfis-mac-mini.taila833af.ts.net:10000';
 
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
