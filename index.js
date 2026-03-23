@@ -3,12 +3,12 @@ const { WebSocketServer, WebSocket } = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
-const UPSTREAM = 'wss://alfis-mac-mini.taila833af.ts.net:10000';
+const UPSTREAM = process.env.UPSTREAM_URL || 'wss://alfis-mac-mini.taila833af.ts.net:10000';
 
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok' }));
+    res.end(JSON.stringify({ status: 'ok', upstream: UPSTREAM }));
     return;
   }
   res.writeHead(404);
@@ -19,17 +19,26 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 
 wss.on('connection', (client, req) => {
   const forwardHeaders = {};
-  const passthrough = ['authorization', 'cookie', 'token', 'x-auth-token'];
   for (const [key, val] of Object.entries(req.headers)) {
-    if (passthrough.includes(key.toLowerCase()) || key.toLowerCase().startsWith('x-')) {
+    if (['authorization', 'cookie', 'token', 'x-auth-token'].includes(key.toLowerCase()) || key.toLowerCase().startsWith('x-')) {
       forwardHeaders[key] = val;
     }
   }
 
   const upstream = new WebSocket(UPSTREAM, { headers: forwardHeaders, rejectUnauthorized: false });
+  
+  // Buffer messages from client until upstream is open
+  const buffer = [];
+  let upstreamReady = false;
 
   upstream.on('open', () => {
     console.log(`[relay] upstream connected for ${req.socket.remoteAddress}`);
+    upstreamReady = true;
+    // Flush buffered messages
+    for (const { data, isBinary } of buffer) {
+      upstream.send(data, { binary: isBinary });
+    }
+    buffer.length = 0;
   });
 
   upstream.on('message', (data, isBinary) => {
@@ -52,8 +61,11 @@ wss.on('connection', (client, req) => {
   });
 
   client.on('message', (data, isBinary) => {
-    if (upstream.readyState === WebSocket.OPEN) {
+    if (upstreamReady && upstream.readyState === WebSocket.OPEN) {
       upstream.send(data, { binary: isBinary });
+    } else {
+      // Buffer until upstream is ready
+      buffer.push({ data, isBinary });
     }
   });
 
@@ -69,5 +81,5 @@ wss.on('connection', (client, req) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`[relay] listening on ${HOST}:${PORT}`);
+  console.log(`[relay] listening on ${HOST}:${PORT} → ${UPSTREAM}`);
 });
