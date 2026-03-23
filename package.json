@@ -1,0 +1,12 @@
+{
+  "name": "claw3d-relay",
+  "version": "1.0.0",
+  "description": "WebSocket relay proxy for Claw3D → OpenClaw gateway",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
